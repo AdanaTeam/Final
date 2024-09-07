@@ -1,0 +1,1 @@
+python -m venv .venv & attrib +h .venv & pause
