@@ -2,12 +2,9 @@ def show_commands():
    print ('exit - закрытие программы\n')
 
 
-command_list = {
-    'exit': exit,
-    'help': show_commands
-}
 
-def run():
+def run(command_list):
+
 
     print('Adana v0.0: Нейронная сеть, анализирующая изображения на следы редактирования')
     print('https://github.com/AdanaTeam/Final')
@@ -21,4 +18,4 @@ def run():
         else:
             print(f"Команда  \"{command}\" не найдена.\n")
 
-# run()
+# run(command_list)
