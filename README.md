@@ -6,3 +6,5 @@
 Запустить [env.bat](env.bat) (нужен установленный Python)
 
 После запуска [env.bat](env.bat) или после изменения [requirements.txt](requirements.txt) запускать [update.bat](update.bat)
+
+Для запуска обучения выполнить файл [start.bat](start.bat)
