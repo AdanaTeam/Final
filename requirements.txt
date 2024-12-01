@@ -1,2 +1,6 @@
 pillow
-tensorflow
+keras
+matplotlib
+scikit-learn
+pillow
+numpy

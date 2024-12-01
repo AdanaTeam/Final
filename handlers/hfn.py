@@ -2,7 +2,7 @@
 
 from PIL import Image
 import numpy as np
-import internal
+from . import internal
 
 __all__ = ["Prepare"]
 
@@ -10,7 +10,7 @@ __all__ = ["Prepare"]
 def Prepare(pathToImage: str, quality: int, size: tuple[int, int]) -> np.ndarray:
     image = HFN(pathToImage, quality)
     image = image.resize(size)
-    data = np.array(image.flatten() / 255)
+    data = np.array(image).flatten() / 255
     return data
 
 
@@ -22,7 +22,7 @@ def HFN(pathToImage: str, quality: int) -> Image:
 
 
 def Enhance(image: Image) -> Image:
-    extrema = image.getextrema()
+    extrema = max(image.getextrema())
     if extrema == 0:
         extrema = 1
     image = internal.Enhance(image, extrema)
