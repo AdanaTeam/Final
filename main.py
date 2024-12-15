@@ -6,6 +6,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 import matplotlib.pyplot as plt
 import numpy as np
+from tensorflow.keras.regularizers import l2
+from tensorflow.keras.optimizers import AdamW
+from tensorflow.keras.callbacks import EarlyStopping
 
 DATASET_TRAIN_PATH = os.path.join('dataset', 'train') 
 FAKE_FOLDER = os.path.join(DATASET_TRAIN_PATH, 'fake') 
@@ -14,6 +17,9 @@ REAL_FOLDER = os.path.join(DATASET_TRAIN_PATH, 'real')
 X_ELA = []
 X_HFN = []
 Y = []
+
+regularizer = l2(0.001)
+early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 
 
 def main():
@@ -73,21 +79,22 @@ def shuffle_data():
 
 def split_data():
     global X_ELA, X_HFN, Y
-    x_ela_train, x_ela_test, y_train, y_test = train_test_split(X_ELA, Y, test_size = 0.2, random_state=47)
-    x_hfn_train, x_hfn_test, _, _ = train_test_split(X_HFN, Y, test_size = 0.2, random_state=47)
+    x_ela_train, x_ela_test, y_train, y_test = train_test_split(X_ELA, Y, test_size = 0.2, train_size=0.8, random_state=47)
+    x_hfn_train, x_hfn_test, _, _ = train_test_split(X_HFN, Y, test_size = 0.2, train_size=0.8, random_state=47)
     return np.array(x_ela_train), np.array(x_hfn_train), np.array(y_train), np.array(x_ela_test), np.array(x_hfn_test), np.array(y_test)
 
 
 def get_cnn_model(input_shape):
     input_layer = Input(shape=input_shape)
-    conv_layer = Convolution2D(32, (5, 5), activation='relu')(input_layer)
+    conv_layer = Convolution2D(64, (3, 3), activation='relu', kernel_regularizer=regularizer)(input_layer)
+    conv_layer = Convolution2D(64, (3, 3), activation='relu', kernel_regularizer=regularizer)(conv_layer)
     pool_layer = MaxPool2D(pool_size = (2, 2))(conv_layer)
     drop_layer = Dropout(0.25)(pool_layer)
     flat_layer = Flatten()(drop_layer)
     dense_layer = Dense(128, activation='relu')(flat_layer)
     return [input_layer, dense_layer]
 
-
+ 
 def get_model():
     cnn_model1 = get_cnn_model((128, 128, 3))
     cnn_model2 = get_cnn_model((128, 128, 1))
@@ -105,7 +112,7 @@ def train(model):
     epochs = 15
     batchSize = 50
     model.compile(
-        optimizer = 'adam',
+        optimizer = AdamW(learning_rate=0.001, weight_decay=0.0001),
         loss = 'binary_crossentropy',
         metrics = ['accuracy'])
     hist = model.fit(
@@ -113,6 +120,7 @@ def train(model):
         y_train,
         batch_size = batchSize,
         epochs = epochs,
+        callbacks=[early_stopping],
         validation_data = ([x_ela_test, x_hfn_test], y_test))
     model.save('model.keras')
     return hist
