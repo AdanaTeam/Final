@@ -9,10 +9,17 @@ import numpy as np
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.optimizers import AdamW
 from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.losses import BinaryCrossentropy
+from tensorflow.keras.metrics import BinaryAccuracy
+import tensorflow as tf
 
-DATASET_TRAIN_PATH = os.path.join('dataset', 'train') 
-FAKE_FOLDER = os.path.join(DATASET_TRAIN_PATH, 'fake') 
-REAL_FOLDER = os.path.join(DATASET_TRAIN_PATH, 'real') 
+# Путь к корневой директории датасета CASIA 2
+ROOT_DATASET_PATH = 'CASIA2'
+
+# Пути к папкам с данными
+AU_FOLDER = os.path.join(ROOT_DATASET_PATH, 'Au')
+TP_FOLDER = os.path.join(ROOT_DATASET_PATH, 'Tp')
+GROUNDTRUTH_FOLDER = os.path.join(ROOT_DATASET_PATH, 'CASIA 2 Groundtruth')
 
 X_ELA = []
 X_HFN = []
@@ -29,40 +36,46 @@ def main():
     hist = train(model)
     show_history_plot(hist)
 
-
 def prepare_images():
-    global X_ELA, X_HFN, Y, FAKE_FOLDER, REAL_FOLDER
+    global X_ELA, X_HFN, Y, AU_FOLDER, TP_FOLDER, GROUNDTRUTH_FOLDER
     quality = 90
     size = (128, 128)
+    
     print('Loading...')
     amount = 0
-    for _, _, fileNames in os.walk(REAL_FOLDER):
+    for _, _, fileNames in os.walk(AU_FOLDER):
         for fileName in fileNames:
             amount += 1
-    for _, _, fileNames in os.walk(FAKE_FOLDER):
+    for _, _, fileNames in os.walk(TP_FOLDER):
         for fileName in fileNames:
             amount += 1
+            
     count = 0
-    for dirName, _, fileNames in os.walk(REAL_FOLDER):
+    for dirName, _, fileNames in os.walk(AU_FOLDER):
         for fileName in fileNames:
             count += 1
             fullPath = os.path.join(dirName, fileName)
             X_ELA.append(handlers.ELA(fullPath, quality, size))
             X_HFN.append(handlers.HFN(fullPath, quality, size))
             Y.append(0)
-            if(count%50==0):
-                print ("\033[A                             \033[A")
+            if(count % 50 == 0):
+                print("\033[A                             \033[A")
                 print(f'{count}/{amount}')
-    for dirName, _, fileNames in os.walk(FAKE_FOLDER):
+                
+    for dirName, _, fileNames in os.walk(TP_FOLDER):
         for fileName in fileNames:
             count += 1
             fullPath = os.path.join(dirName, fileName)
+            groundTruthFile = os.path.join(GROUNDTRUTH_FOLDER, fileName.replace('.tif', '.bmp'))
+            if not os.path.exists(groundTruthFile):
+                continue
             X_ELA.append(handlers.ELA(fullPath, quality, size))
             X_HFN.append(handlers.HFN(fullPath, quality, size))
             Y.append(1)
-            if(count%50==0):
-                print ("\033[A                             \033[A")
+            if(count % 50 == 0):
+                print("\033[A                             \033[A")
                 print(f'{count}/{amount}')
+                
     X_ELA = np.array(X_ELA).reshape(-1, 128, 128, 3)
     X_HFN = np.array(X_HFN).reshape(-1, 128, 128, 1)
     Y = to_categorical(Y, 2)
@@ -91,7 +104,7 @@ def get_cnn_model(input_shape):
     pool_layer = MaxPool2D(pool_size = (2, 2))(conv_layer)
     drop_layer = Dropout(0.25)(pool_layer)
     flat_layer = Flatten()(drop_layer)
-    dense_layer = Dense(128, activation='relu')(flat_layer)
+    dense_layer = Dense(128, activation='relu', kernel_regularizer=regularizer)(flat_layer)
     return [input_layer, dense_layer]
 
  
