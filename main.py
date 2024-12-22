@@ -15,6 +15,8 @@ import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.initializers import HeNormal
 from tensorflow.keras.metrics import AUC
+from keras.models import load_model
+from PIL import Image, ImageChops, ImageEnhance
 
 tf.keras.mixed_precision.set_global_policy('mixed_float16')
 
@@ -29,6 +31,7 @@ GROUNDTRUTH_FOLDER = os.path.join(ROOT_DATASET_PATH, 'CASIA 2 Groundtruth')
 X_ELA = []
 X_HFN = []
 Y = []
+class_names = ['real', 'fake']
 
 regularizer = l2(0.001)
 early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
@@ -41,11 +44,55 @@ checkpoint_callback = ModelCheckpoint(
 
 
 def main():
-    prepare_images()
-    shuffle_data()
-    model = get_model()
-    hist = train(model)
-    show_history_plot(hist)
+    while True:
+        print("\nМеню:")
+        print("1. Обучить нейросеть")
+        print("2. Выбрать изображение для предсказания")
+        choice = input("Введите номер действия (или 'exit' для выхода): ")
+        
+        if choice == '1':
+            prepare_images()
+            shuffle_data()
+            model = get_model()
+            history = train(model)
+            show_history_plot(history)
+            
+        elif choice == '2':
+            model = load_model('model.keras')
+            image_path = input("Введите путь к изображению: ")
+            display_image_with_prediction(image_path, model)
+            
+        elif choice.lower() == 'exit':
+            break
+
+def prepare_image_for_prediction(image_path):
+    image_ela = handlers.ELA(image_path, quality=90, size=(128, 128))
+    image_ela = image_ela.reshape(1, 128, 128, 3)
+
+    image_hfn = handlers.HFN(image_path, quality=90, size=(128, 128))
+    image_hfn = image_hfn.reshape(1, 128, 128, 1)
+
+    return image_ela, image_hfn
+
+
+def predict_single_image(image_path, model):
+    image_ela, image_hfn = prepare_image_for_prediction(image_path)
+    
+    y_pred = model.predict([image_ela, image_hfn])
+    y_pred_class = np.argmax(y_pred, axis=1)[0]
+    confidence = np.amax(y_pred) * 100
+    return class_names[y_pred_class], confidence
+
+image_size = (128, 128)
+
+def display_image_with_prediction(image_path, model):
+    image = Image.open(image_path)
+    plt.imshow(image)
+    plt.axis('off')
+    plt.show()
+    image_class, confidence = predict_single_image(image_path, model)
+    print(f'Prediction: Class: {image_class}, Confidence: {confidence:.2f}%')
+
 
 def prepare_images():
     global X_ELA, X_HFN, Y, AU_FOLDER, TP_FOLDER, GROUNDTRUTH_FOLDER
