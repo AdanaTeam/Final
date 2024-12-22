@@ -26,7 +26,6 @@ X_HFN = []
 Y = []
 class_names = ['real', 'fake']
 
-regularizer = l2(0.001)
 early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 
 
