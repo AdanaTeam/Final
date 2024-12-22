@@ -6,13 +6,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 import matplotlib.pyplot as plt
 import numpy as np
-from tensorflow.keras.regularizers import l2
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 import tensorflow as tf
-from tensorflow.keras.callbacks import ModelCheckpoint
-from tensorflow.keras.initializers import HeNormal
-from tensorflow.keras.metrics import AUC
 from keras.models import load_model
 from PIL import Image
 
