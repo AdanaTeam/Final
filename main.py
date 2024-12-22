@@ -1,17 +1,22 @@
 import handlers, os
 from keras.utils import to_categorical
-from keras.layers import Input, Convolution2D, Flatten, Dense, Concatenate, MaxPool2D, BatchNormalization, Dropout
+from keras.layers import Input, Convolution2D, Flatten, Dense, Concatenate, MaxPool2D, BatchNormalization, Dropout, GlobalAveragePooling2D
 from keras.models import Model
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 import matplotlib.pyplot as plt
 import numpy as np
 from tensorflow.keras.regularizers import l2
-from tensorflow.keras.optimizers import AdamW
+from tensorflow.keras.optimizers import AdamW, Adam
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.losses import BinaryCrossentropy
 from tensorflow.keras.metrics import BinaryAccuracy
 import tensorflow as tf
+from tensorflow.keras.callbacks import ModelCheckpoint
+from tensorflow.keras.initializers import HeNormal
+from tensorflow.keras.metrics import AUC
+
+tf.keras.mixed_precision.set_global_policy('mixed_float16')
 
 # Путь к корневой директории датасета CASIA 2
 ROOT_DATASET_PATH = 'CASIA2'
@@ -27,6 +32,12 @@ Y = []
 
 regularizer = l2(0.001)
 early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+checkpoint_callback = ModelCheckpoint(
+    filepath='best_model.keras',
+    monitor='val_accuracy',
+    save_best_only=True,
+    mode='max'
+)
 
 
 def main():
@@ -66,9 +77,7 @@ def prepare_images():
         for fileName in fileNames:
             count += 1
             fullPath = os.path.join(dirName, fileName)
-            groundTruthFile = os.path.join(GROUNDTRUTH_FOLDER, fileName.replace('.tif', '.bmp'))
-            if not os.path.exists(groundTruthFile):
-                continue
+
             X_ELA.append(handlers.ELA(fullPath, quality, size))
             X_HFN.append(handlers.HFN(fullPath, quality, size))
             Y.append(1)
@@ -99,35 +108,34 @@ def split_data():
 
 def get_cnn_model(input_shape):
     input_layer = Input(shape=input_shape)
-    conv_layer = Convolution2D(64, (3, 3), activation='relu', kernel_regularizer=regularizer)(input_layer)
-    conv_layer = Convolution2D(64, (3, 3), activation='relu', kernel_regularizer=regularizer)(conv_layer)
-    pool_layer = MaxPool2D(pool_size = (2, 2))(conv_layer)
+    conv_layer = Convolution2D(32, (5, 5), activation='relu')(input_layer)
+    bn_layer = BatchNormalization()(conv_layer)
+    pool_layer = MaxPool2D(pool_size = (2, 2))(bn_layer)
     drop_layer = Dropout(0.25)(pool_layer)
     flat_layer = Flatten()(drop_layer)
-    dense_layer = Dense(128, activation='relu', kernel_regularizer=regularizer)(flat_layer)
+    dense_layer = Dense(128, kernel_initializer=HeNormal(), activation='relu')(flat_layer)
     return [input_layer, dense_layer]
 
- 
+
 def get_model():
     cnn_model1 = get_cnn_model((128, 128, 3))
     cnn_model2 = get_cnn_model((128, 128, 1))
     conc_layer = Concatenate(axis=1)([cnn_model1[-1], cnn_model2[-1]])
     dense_layer = Dense(128, activation='relu')(conc_layer)
     drop_layer = Dropout(0.5)(dense_layer)
-    output_layer = Dense(2, activation='softmax')(drop_layer)
+    output_layer = Dense(2, kernel_initializer=HeNormal(), activation='softmax')(drop_layer)
     model = Model(inputs=[cnn_model1[0], cnn_model2[0]], outputs=output_layer)
     model.summary()
     return model
 
-
 def train(model):
     x_ela_train, x_hfn_train, y_train, x_ela_test, x_hfn_test, y_test = split_data()
-    epochs = 15
-    batchSize = 50
+    epochs = 20
+    batchSize = 64
     model.compile(
-        optimizer = AdamW(learning_rate=0.001, weight_decay=0.0001),
+        optimizer = Adam(learning_rate=1e-4),
         loss = 'binary_crossentropy',
-        metrics = ['accuracy'])
+        metrics = ['accuracy', AUC()])
     hist = model.fit(
         [x_ela_train, x_hfn_train],
         y_train,
